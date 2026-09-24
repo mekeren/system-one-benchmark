@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="tr" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>System One & 3-Way Benchmark Arenası (Microservices)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    body { background-color: #0c0e17; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    .glass { background: rgba(24, 27, 38, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .gradient-text { background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    pre::-webkit-scrollbar { height: 8px; width: 8px; }
+    pre::-webkit-scrollbar-track { background: #0c0e17; border-radius: 8px; }
+    pre::-webkit-scrollbar-thumb { background: #374151; border-radius: 8px; }
+    pre::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+  </style>
+</head>
+<body class="min-h-screen p-4 sm:p-8 flex flex-col items-center">
+  <div class="max-w-6xl w-full space-y-6">
+
+    <!-- Üst Başlık -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-5">
+      <div class="flex items-center space-x-3">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pink-600 via-purple-600 to-blue-500 flex items-center justify-center font-bold text-white text-xl shadow-lg shadow-pink-500/20">
+          <i class="fa-brands fa-docker"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-black text-white tracking-wide">SYSTEM ONE BENCHMARK ARENASI</h1>
+            <span class="text-[11px] px-2 py-0.5 rounded bg-blue-500/20 text-blue-400 font-bold border border-blue-500/30">DOCKER COMPOSE</span>
+          </div>
+          <p class="text-xs text-gray-400">4 Ayrık Servis: Kural Motoru (8001) &bull; Lokal SLM (8002) &bull; Bulut LLM (8003) &bull; UI Gateway (8150)</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3">
+        <button onclick="refreshClusterStats()" class="px-3 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-800 border border-gray-700 text-xs text-gray-300 flex items-center gap-2 transition">
+          <i class="fa-solid fa-arrows-rotate text-pink-400"></i> Metrikleri Yenile
+        </button>
+        <span class="px-3 py-1.5 rounded-xl bg-gray-900 border border-gray-800 text-xs text-emerald-400 flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Küme Canlı
+        </span>
+      </div>
+    </div>
+
+    <!-- 📊 CANLI DOCKER SERVİS KAYNAK KULLANIMLARI (CPU & RAM) -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+      
+      <!-- Servis 1: Kural Motoru -->
+      <div class="glass p-3.5 rounded-2xl border border-gray-800 space-y-1.5" id="metricCardRule">
+        <div class="flex items-center justify-between text-gray-400">
+          <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-bolt text-yellow-400"></i> Motor 1 (Rule)</span>
+          <span id="ruleStatus" class="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono">Online (8001)</span>
+        </div>
+        <div class="flex justify-between items-baseline pt-1">
+          <span class="text-gray-400 text-[11px]">RAM:</span>
+          <span id="ruleMem" class="text-white font-mono font-bold text-sm">~42 MB</span>
+        </div>
+        <div class="flex justify-between items-baseline">
+          <span class="text-gray-400 text-[11px]">CPU:</span>
+          <span id="ruleCpu" class="text-emerald-400 font-mono text-[11px]">Standart AVX2</span>
+        </div>
+      </div>
+
+      <!-- Servis 2: Lokal SLM -->
+      <div class="glass p-3.5 rounded-2xl border border-gray-800 space-y-1.5" id="metricCardSlm">
+        <div class="flex items-center justify-between text-gray-400">
+          <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-brain text-purple-400"></i> Motor 2 (SLM)</span>
+          <span id="slmStatus" class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[10px] font-mono">Online (8002)</span>
+        </div>
+        <div class="flex justify-between items-baseline pt-1">
+          <span class="text-gray-400 text-[11px]">RAM:</span>
+          <span id="slmMem" class="text-white font-mono font-bold text-sm">~45 MB</span>
+        </div>
+        <div class="flex justify-between items-baseline">
+          <span class="text-gray-400 text-[11px]">GGUF:</span>
+          <span id="slmModel" class="text-purple-300 font-mono text-[10px]">Qwen-1.5B (1065MB)</span>
+        </div>
+      </div>
+
+      <!-- Servis 3: Bulut Gateway -->
+      <div class="glass p-3.5 rounded-2xl border border-gray-800 space-y-1.5" id="metricCardCloud">
+        <div class="flex items-center justify-between text-gray-400">
+          <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-cloud text-blue-400"></i> Motor 3 (Cloud)</span>
+          <span id="cloudStatus" class="px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-mono">Online (8003)</span>
+        </div>
+        <div class="flex justify-between items-baseline pt-1">
+          <span class="text-gray-400 text-[11px]">RAM:</span>
+          <span id="cloudMem" class="text-white font-mono font-bold text-sm">~38 MB</span>
+        </div>
+        <div class="flex justify-between items-baseline">
+          <span class="text-gray-400 text-[11px]">API:</span>
+          <span id="cloudModel" class="text-blue-300 font-mono text-[10px]">Groq / LPU</span>
+        </div>
+      </div>
+
+      <!-- Servis 4: UI Gateway -->
+      <div class="glass p-3.5 rounded-2xl border border-gray-800 space-y-1.5" id="metricCardUI">
+        <div class="flex items-center justify-between text-gray-400">
+          <span class="font-bold flex items-center gap-1.5"><i class="fa-solid fa-desktop text-pink-400"></i> Servis 4 (UI)</span>
+          <span class="px-1.5 py-0.5 rounded bg-pink-500/20 text-pink-400 text-[10px] font-mono">Port: 8150</span>
+        </div>
+        <div class="flex justify-between items-baseline pt-1">
+          <span class="text-gray-400 text-[11px]">RAM:</span>
+          <span id="uiMem" class="text-white font-mono font-bold text-sm">~36 MB</span>
+        </div>
+        <div class="flex justify-between items-baseline">
+          <span class="text-gray-400 text-[11px]">Gateway:</span>
+          <span class="text-pink-300 font-mono text-[10px]">Asenkron Paralel</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 🔑 BULUT API AYARLARI KARTI -->
+    <div class="glass p-4 rounded-3xl border border-gray-800 space-y-3 shadow-xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800/80 pb-2">
+        <h2 class="text-xs font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-key text-pink-400"></i> Bulut Modeli (Motor 3) Ayarları
+        </h2>
+        <div class="flex items-center gap-2">
+          <button onclick="fetchAvailableModels()" id="btnFetchModels" class="px-2.5 py-1 rounded-xl bg-pink-500/20 hover:bg-pink-500/30 text-pink-400 border border-pink-500/30 text-[11px] font-bold flex items-center gap-1.5 transition active:scale-95">
+            <i class="fa-solid fa-cloud-arrow-down"></i> Modelleri Hesabımdan Çek
+          </button>
+          <span class="text-[11px] text-gray-400 hidden md:inline">Key girildiğinde 3. motor buluta sorgu atar</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+        <div class="space-y-1">
+          <label class="font-semibold text-gray-300">API Key:</label>
+          <input id="apiKeyInput" type="password" placeholder="gsk_... veya key yapıştırın" 
+                 class="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-700 text-white font-mono focus:outline-none focus:border-pink-500">
+        </div>
+        <div class="space-y-1">
+          <label class="font-semibold text-gray-300">Sağlayıcı (Base URL):</label>
+          <input id="baseUrlInput" type="text" value="https://api.groq.com/openai/v1" 
+                 class="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-700 text-white font-mono focus:outline-none focus:border-pink-500">
+        </div>
+        <div class="space-y-1">
+          <label class="font-semibold text-gray-300 flex justify-between">
+            <span>Bulut Modeli:</span>
+            <span class="text-[10px] text-pink-400 cursor-pointer" onclick="toggleCustomModelInput()">Manuel Yaz ✎</span>
+          </label>
+          <div id="modelSelectContainer">
+            <select id="modelSelect" class="w-full px-3 py-2 rounded-xl bg-gray-950 border border-gray-700 text-white font-mono focus:outline-none focus:border-pink-500">
+              <optgroup label="✅ Hesabınızdaki Modeller">
+                <option value="openai/gpt-oss-120b" selected>openai/gpt-oss-120b (Tavsiye Edilen)</option>
+                <option value="openai/gpt-oss-20b">openai/gpt-oss-20b</option>
+                <option value="qwen/qwen3.8-27b">qwen/qwen3.8-27b</option>
+                <option value="openai/gpt-oss-safeguard-20b">openai/gpt-oss-safeguard-20b</option>
+                <option value="canopylabs/orpheus-v1-english">canopylabs/orpheus-v1-english</option>
+                <option value="canopylabs/orpheus-arabic-saudi">canopylabs/orpheus-arabic-saudi</option>
+                <option value="meta-llama/llama-prompt-guard-2-86m">meta-llama/llama-prompt-guard-2-86m</option>
+                <option value="meta-llama/llama-prompt-guard-2-22m">meta-llama/llama-prompt-guard-2-22m</option>
+              </optgroup>
+              <optgroup label="🌐 Genel Groq Modelleri (Yetki Gerekebilir)">
+                <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile</option>
+                <option value="llama-3.1-8b-instant">llama-3.1-8b-instant</option>
+                <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+              </optgroup>
+            </select>
+          </div>
+          <div id="modelCustomContainer" class="hidden">
+            <input id="modelCustomInput" type="text" placeholder="Örn: openai/gpt-oss-120b" 
+                   class="w-full px-3 py-2 rounded-xl bg-gray-950 border border-pink-500 text-white font-mono text-xs focus:outline-none">
+          </div>
+        </div>
+      </div>
+      <div id="modelNote" class="text-[11px] text-gray-400 bg-gray-900/40 px-3 py-1.5 rounded-xl border border-gray-800/80 flex items-center justify-between">
+        <span>💡 <b>İpucu:</b> Harici API sağlayıcınızda (Groq, OpenAI vb.) tanımlı olan modelleri seçebilirsiniz. Listenizdeki <code>openai/gpt-oss-120b</code> veya <code>qwen/qwen3.8-27b</code> gibi modelleri kullanabilirsiniz.</span>
+      </div>
+    </div>
+
+    <!-- 🎯 KARAR ŞEMASI & SEÇENEK EDİTÖRÜ (CHOICE / CRITERIA EDITOR) -->
+    <div class="glass p-4 rounded-3xl border border-gray-800 space-y-3 shadow-xl">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800/80 pb-2.5">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">
+            <i class="fa-solid fa-sliders"></i>
+          </div>
+          <div>
+            <h2 class="text-xs font-bold text-white flex items-center gap-2">
+              Dinamik Karar Şeması & Seçenekler (Choice / Criteria Editor)
+            </h2>
+            <p class="text-[10px] text-gray-400">TypeSafe AI Jev standardı: Her seçenek için anahtar (Key) ve yönlendirme kriteri (Criteria)</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span id="choiceCountBadge" class="px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 text-[10px] font-mono font-bold">4 Seçenek Aktif</span>
+          <button onclick="toggleChoiceEditorCollapse()" id="btnToggleChoiceEditor" class="px-2.5 py-1 rounded-xl bg-gray-900 hover:bg-gray-800 text-gray-300 text-[11px] font-semibold flex items-center gap-1 border border-gray-800 transition">
+            <span id="txtToggleChoiceEditor">Gizle</span> <i id="iconToggleChoiceEditor" class="fa-solid fa-chevron-up text-[10px]"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="choiceEditorBody" class="space-y-3">
+        <!-- Hazır Şablonlar (Presets) -->
+        <div class="flex flex-wrap items-center gap-2 text-xs">
+          <span class="text-gray-400 text-[11px] font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-wand-magic-sparkles text-pink-400"></i> Hazır Şablonlar:
+          </span>
+          <button id="presetBtn_agents_abc" onclick="loadPreset('agents_abc')" class="preset-btn px-2.5 py-1 rounded-xl border border-pink-500 bg-pink-500/20 text-pink-300 font-semibold text-[11px] flex items-center gap-1.5 transition active:scale-95">
+            🤖 Çoklu Ajan Şablonu (Agent A / B / C)
+          </button>
+          <button id="presetBtn_ecommerce" onclick="loadPreset('ecommerce')" class="preset-btn px-2.5 py-1 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-300 font-semibold text-[11px] flex items-center gap-1.5 transition active:scale-95">
+            🛍️ E-Ticaret & Destek
+          </button>
+          <button id="presetBtn_hr" onclick="loadPreset('hr')" class="preset-btn px-2.5 py-1 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-300 font-semibold text-[11px] flex items-center gap-1.5 transition active:scale-95">
+            👥 İK & Şirket İçi Operasyon
+          </button>
+        </div>
+
+        <!-- Seçenek Tablosu -->
+        <div class="overflow-x-auto rounded-2xl border border-gray-800/80 bg-gray-950/40 p-2">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-gray-400 text-[10px] uppercase font-mono tracking-wider border-b border-gray-800/80">
+                <th class="pb-1.5 pl-1 w-1/3">Seçenek ID (Choice Key)</th>
+                <th class="pb-1.5 pl-1">Yönlendirme Kriteri / Tanım (Criteria Description)</th>
+                <th class="pb-1.5 text-center w-10">İşlem</th>
+              </tr>
+            </thead>
+            <tbody id="criteriaTableBody" class="divide-y divide-gray-800/40">
+              <!-- Dinamik satırlar JavaScript ile doldurulacak -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Buton Çubuğu: Satır Ekle -->
+        <div class="flex items-center justify-between pt-1">
+          <button onclick="addChoiceRow('', '')" class="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-bold flex items-center gap-1.5 transition active:scale-95">
+            <i class="fa-solid fa-plus"></i> Yeni Seçenek Ekle
+          </button>
+          <span class="text-[10px] text-gray-400 italic">Tanımladığınız seçenekler anında 3 motora (Kural, SLM ve Cloud) aktarılır.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 🥊 3'LÜ TEST ALANI (INPUT & BUTTON) -->
+    <div class="space-y-3">
+      <!-- Hızlı Test Butonları (Aktif Şablona Göre Dinamik) -->
+      <div class="space-y-1.5">
+        <div class="text-[11px] text-gray-400 font-semibold flex items-center justify-between">
+          <span><i class="fa-solid fa-bolt text-yellow-400"></i> Hızlı Test Senaryoları (Seçilen Şablona Göre Otomatik Güncellenir):</span>
+          <span class="text-[10px] text-gray-500 hidden sm:inline">Tıklayarak doğrudan test edebilirsiniz</span>
+        </div>
+        <div id="quickTestButtons" class="flex flex-wrap gap-2 text-xs">
+          <!-- Dinamik Test Butonları Buraya Eklenecek -->
+        </div>
+      </div>
+
+      <!-- Mesaj Girişi & Karşılaştır Butonu -->
+      <div class="flex gap-2">
+        <input id="testMsgInput" type="text" value="sürüm yayını ile ilgili görev açar mısın" 
+               class="flex-1 px-4 py-3.5 rounded-2xl bg-gray-950 border border-gray-700 text-white text-sm focus:outline-none focus:border-pink-500 font-mono shadow-inner">
+        <button onclick="runCompare()" id="btnCompare"
+                class="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-pink-600 via-purple-600 to-blue-600 hover:from-pink-500 hover:to-blue-500 text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center gap-2 transition active:scale-95 whitespace-nowrap">
+          <i class="fa-solid fa-play"></i> 3 Motoru Eşzamanlı Yarıştır
+        </button>
+      </div>
+    </div>
+
+    <!-- 🏆 KONSENSÜS / FİKİR BİRLİĞİ BANDI -->
+    <div id="consensusBanner" class="hidden glass p-4 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3 transition">
+      <div class="flex items-center space-x-3">
+        <div id="consensusIcon" class="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-bold"></div>
+        <div>
+          <h3 id="consensusTitle" class="text-sm font-bold"></h3>
+          <p id="consensusDesc" class="text-xs text-gray-400"></p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-gray-400">En Hızlı Motor:</span>
+        <span id="winnerSpeedBadge" class="px-3 py-1 rounded-xl font-mono text-xs font-bold bg-pink-500/20 text-pink-400 border border-pink-500/30"></span>
+      </div>
+    </div>
+
+    <!-- 3 MOTOR YAN YANA KARŞILAŞTIRMA KARTLARI -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- MOTOR 1: KURAL TABANLI CPU -->
+      <div class="glass p-5 rounded-3xl border border-gray-800 space-y-4 relative flex flex-col justify-between transition" id="cardEngine1">
+        <div>
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-xs font-bold">1</span>
+              <div>
+                <h3 class="text-sm font-bold text-white">Kural Motoru</h3>
+                <p class="text-[10px] text-gray-400">Kelime / Regex Eşleme</p>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">$0 Maliyet</span>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <div>
+              <span class="text-[11px] text-gray-400 block mb-1">Yönlendirilen Ajan:</span>
+              <div id="resE1Choice" class="text-lg font-black text-white font-mono bg-gray-950 p-2.5 rounded-xl border border-gray-800 text-center">-</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-gray-900/60 p-2 rounded-xl">
+                <span class="text-gray-400 block text-[10px]">Gecikme:</span>
+                <span id="resE1Latency" class="text-emerald-400 font-bold font-mono">-</span>
+              </div>
+              <div class="bg-gray-900/60 p-2 rounded-xl">
+                <span class="text-gray-400 block text-[10px]">Güven Oranı:</span>
+                <span id="resE1Conf" class="text-yellow-400 font-bold font-mono">-</span>
+              </div>
+            </div>
+
+            <!-- Jev Primitifleri: Score & Noul -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-gray-900/40 p-2 rounded-xl border border-gray-800/60">
+                <span class="text-gray-400 block text-[10px]">Score (Aciliyet):</span>
+                <span id="resE1Score" class="text-yellow-400 font-bold font-mono text-[11px]">-</span>
+              </div>
+              <div class="bg-gray-900/40 p-2 rounded-xl border border-gray-800/60">
+                <span class="text-gray-400 block text-[10px]">Noul (Aksiyon):</span>
+                <span id="resE1Noul" class="text-cyan-400 font-bold font-mono text-[11px]">-</span>
+              </div>
+            </div>
+
+            <div class="bg-gray-900/40 p-2.5 rounded-xl border border-gray-800/80 text-[11px] text-gray-300">
+              <span class="text-gray-500 block text-[10px] uppercase font-bold mb-0.5">Karar Gerekçesi:</span>
+              <p id="resE1Reason" class="italic">-</p>
+            </div>
+
+            <!-- 💬 Ham Çıktı Butonu (Motor 1) -->
+            <button id="btnRaw1" onclick="toggleRawView(1)" class="w-full mt-2 py-2 px-3 rounded-xl bg-gray-900 hover:bg-gray-800/90 border border-gray-800 text-[11px] font-mono text-gray-300 hover:text-yellow-400 flex items-center justify-between transition active:scale-95 shadow-sm">
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-code text-yellow-400"></i> Ham Çıktı & JSON</span>
+              <i id="iconRaw1" class="fa-solid fa-chevron-down text-[10px] text-gray-500 transition-transform duration-200"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-800/80 text-[10px] text-gray-400 flex justify-between">
+          <span><i class="fa-solid fa-lock text-emerald-400"></i> %100 Lokal</span>
+          <span>AVX2 CPU</span>
+        </div>
+      </div>
+
+      <!-- MOTOR 2: LOKAL NÖRAL SLM -->
+      <div class="glass p-5 rounded-3xl border border-purple-500/30 space-y-4 relative flex flex-col justify-between shadow-lg shadow-purple-950/20 transition" id="cardEngine2">
+        <div class="absolute -top-3 right-4 px-2 py-0.5 rounded-full bg-gradient-to-r from-purple-600 to-pink-600 text-white text-[10px] font-bold shadow">
+          YÜKLEM & NİYET ÇÖZÜCÜ
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">2</span>
+              <div>
+                <h3 class="text-sm font-bold text-white">Lokal Nöral SLM</h3>
+                <p class="text-[10px] text-purple-400">Qwen2.5-1.5B (GGUF CPU)</p>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">$0 Maliyet</span>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <div>
+              <span class="text-[11px] text-gray-400 block mb-1">Yönlendirilen Ajan:</span>
+              <div id="resE2Choice" class="text-lg font-black text-purple-300 font-mono bg-purple-950/30 p-2.5 rounded-xl border border-purple-800/50 text-center">-</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-gray-900/60 p-2 rounded-xl">
+                <span class="text-gray-400 block text-[10px]">Gecikme:</span>
+                <span id="resE2Latency" class="text-emerald-400 font-bold font-mono">-</span>
+              </div>
+              <div class="bg-gray-900/60 p-2 rounded-xl">
+                <span class="text-gray-400 block text-[10px]">Güven Oranı:</span>
+                <span id="resE2Conf" class="text-purple-400 font-bold font-mono">-</span>
+              </div>
+            </div>
+
+            <!-- Jev Primitifleri: Score & Noul -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-purple-950/30 p-2 rounded-xl border border-purple-900/40">
+                <span class="text-purple-300 block text-[10px]">Score (Aciliyet):</span>
+                <span id="resE2Score" class="text-purple-300 font-bold font-mono text-[11px]">-</span>
+              </div>
+              <div class="bg-purple-950/30 p-2 rounded-xl border border-purple-900/40">
+                <span class="text-purple-300 block text-[10px]">Noul (Aksiyon):</span>
+                <span id="resE2Noul" class="text-cyan-400 font-bold font-mono text-[11px]">-</span>
+              </div>
+            </div>
+
+            <div class="bg-purple-950/20 p-2.5 rounded-xl border border-purple-900/50 text-[11px] text-purple-200">
+              <span class="text-purple-400 block text-[10px] uppercase font-bold mb-0.5">Semantik Yüklem Analizi:</span>
+              <p id="resE2Reason" class="italic">-</p>
+            </div>
+
+            <!-- 💬 Ham Çıktı Butonu (Motor 2) -->
+            <button id="btnRaw2" onclick="toggleRawView(2)" class="w-full mt-2 py-2 px-3 rounded-xl bg-purple-950/40 hover:bg-purple-900/60 border border-purple-800/50 text-[11px] font-mono text-purple-300 hover:text-purple-100 flex items-center justify-between transition active:scale-95 shadow-sm">
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-code text-purple-400"></i> Ham Çıktı & JSON</span>
+              <i id="iconRaw2" class="fa-solid fa-chevron-down text-[10px] text-purple-400/70 transition-transform duration-200"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-800/80 text-[10px] text-gray-400 flex justify-between">
+          <span><i class="fa-solid fa-shield-halved text-emerald-400"></i> %100 Kurum İçi</span>
+          <span>1.5B Kuantize CPU</span>
+        </div>
+      </div>
+
+      <!-- MOTOR 3: HARİCİ BULUT LLM -->
+      <div class="glass p-5 rounded-3xl border border-gray-800 space-y-4 relative flex flex-col justify-between transition" id="cardEngine3">
+        <div>
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-xs font-bold">3</span>
+              <div>
+                <h3 class="text-sm font-bold text-white">Harici Bulut LLM</h3>
+                <p class="text-[10px] text-blue-400" id="resE3ModelName">Groq / OpenAI API</p>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">API Token</span>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <div>
+              <span class="text-[11px] text-gray-400 block mb-1">Yönlendirilen Ajan:</span>
+              <div id="resE3Choice" class="text-lg font-black text-blue-300 font-mono bg-blue-950/30 p-2.5 rounded-xl border border-blue-800/50 text-center">-</div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-gray-900/60 p-2 rounded-xl">
+                <span class="text-gray-400 block text-[10px]">Gecikme:</span>
+                <span id="resE3Latency" class="text-blue-400 font-bold font-mono">-</span>
+              </div>
+              <div class="bg-gray-900/60 p-2 rounded-xl">
+                <span class="text-gray-400 block text-[10px]">Güven Oranı:</span>
+                <span id="resE3Conf" class="text-blue-400 font-bold font-mono">-</span>
+              </div>
+            </div>
+
+            <!-- Jev Primitifleri: Score & Noul -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-blue-950/30 p-2 rounded-xl border border-blue-900/40">
+                <span class="text-blue-300 block text-[10px]">Score (Aciliyet):</span>
+                <span id="resE3Score" class="text-blue-300 font-bold font-mono text-[11px]">-</span>
+              </div>
+              <div class="bg-blue-950/30 p-2 rounded-xl border border-blue-900/40">
+                <span class="text-blue-300 block text-[10px]">Noul (Aksiyon):</span>
+                <span id="resE3Noul" class="text-cyan-400 font-bold font-mono text-[11px]">-</span>
+              </div>
+            </div>
+
+            <div class="bg-gray-900/40 p-2.5 rounded-xl border border-gray-800/80 text-[11px] text-gray-300">
+              <span class="text-gray-500 block text-[10px] uppercase font-bold mb-0.5">Bulut Çıkarımı:</span>
+              <p id="resE3Reason" class="italic">-</p>
+            </div>
+
+            <!-- 💬 Ham Çıktı Butonu (Motor 3) -->
+            <button id="btnRaw3" onclick="toggleRawView(3)" class="w-full mt-2 py-2 px-3 rounded-xl bg-blue-950/40 hover:bg-blue-900/60 border border-blue-800/50 text-[11px] font-mono text-blue-300 hover:text-blue-100 flex items-center justify-between transition active:scale-95 shadow-sm">
+              <span class="flex items-center gap-1.5"><i class="fa-solid fa-code text-blue-400"></i> Ham Çıktı & JSON</span>
+              <i id="iconRaw3" class="fa-solid fa-chevron-down text-[10px] text-blue-400/70 transition-transform duration-200"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-gray-800/80 text-[10px] text-gray-400 flex justify-between">
+          <span><i class="fa-solid fa-cloud-arrow-up text-blue-400"></i> Dış Bulut</span>
+          <span>Groq LPU / OpenAI</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 💬 KONUŞMA BALONU ŞEKLİNDE GENİŞLETİLMİŞ HAM ÇIKTI PANELİ (W-FULL, TEK AÇILAN BALON) -->
+    <div id="rawSpeechBubble" class="hidden transition-all duration-300 relative w-full pt-4">
+      
+      <!-- Balon Oku / Gösterge (Card 1: 16.6%, Card 2: 50%, Card 3: 83.3%) -->
+      <div id="speechArrow" class="absolute top-1 left-[16.6%] -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-b-8 border-b-yellow-500 transition-all duration-300"></div>
+
+      <div id="speechBubbleBox" class="glass rounded-3xl border border-yellow-500/40 p-5 shadow-2xl space-y-3 relative bg-[#090b12]/95 backdrop-blur-xl">
+        <!-- Balon Başlığı & Kontrolleri -->
+        <div class="flex items-center justify-between border-b border-gray-800/80 pb-3">
+          <div class="flex items-center gap-2.5">
+            <span id="speechBadge" class="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">Motor 1</span>
+            <h4 id="speechTitle" class="text-sm font-bold text-white">Kural Motoru Ham API & Log Yanıtı</h4>
+            <span id="speechSub" class="text-[11px] text-gray-400 font-mono hidden sm:inline">&bull; Yanlardan kod kaybı olmadan tam genişlik</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="copyRawJson()" class="px-3 py-1.5 rounded-xl bg-gray-900 hover:bg-gray-800 border border-gray-700 text-xs text-gray-300 flex items-center gap-1.5 transition active:scale-95">
+              <i class="fa-regular fa-copy text-pink-400"></i> <span id="copyBtnText">Kopyala</span>
+            </button>
+            <button onclick="closeRawView()" class="w-8 h-8 rounded-xl bg-gray-900 hover:bg-red-500/20 hover:text-red-400 border border-gray-800 text-gray-400 flex items-center justify-center text-sm transition">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Geniş Kod Alanı (Sıfır Kesilme, Genişletilmiş Görünüm) -->
+        <div class="relative">
+          <pre id="rawCodeBlock" class="w-full max-h-[460px] overflow-auto rounded-2xl bg-[#06070a] p-4 font-mono text-xs text-emerald-400 leading-relaxed border border-gray-800/90 shadow-inner select-all"></pre>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Global Benchmark State
+    let latestBenchmarkData = null;
+    let activeRawIndex = null;
+    let isChoiceEditorCollapsed = false;
+
+    // Hazır Karar Şemaları (TypeSafe AI Jev Choice Presets)
+    const PRESETS = {
+      agents_abc: {
+        name: "Genel Ajanlar (Agent A / B / C)",
+        options: [
+          { key: "agent-a", desc: "Altyapı ve Veri Yönetimi (Sunucu, veri depolama, yedekleme ve kurtarma operasyonları)" },
+          { key: "agent-b", desc: "Yazılım, Dağıtım & CI/CD (Pipeline, derleme, konteyner, servis yayını ve izleme)" },
+          { key: "agent-c", desc: "İş Takibi, Görev & Planlama (Görev/task açma, atama, durum sorgulama ve planlama)" },
+          { key: "unclear_fallback", desc: "Genel veya sınıflandırılamayan talepler" }
+        ],
+        samples: [
+          { text: "sürüm yayını ile ilgili görev açar mısın", label: "🔥 Tuzak: 'Sürüm yayını ile ilgili görev aç'", color: "text-purple-400" },
+          { text: "servisi canlıya al ve sürüm yayınını başlat", label: "🚀 Agent B: 'Servisi canlıya al / yayınla'", color: "text-blue-400" },
+          { text: "dün geceki veri yedekleme neden başarısız oldu, hata logunu açıkla", label: "💾 Agent A: 'Veri yedekleme neden fail oldu'", color: "text-emerald-400" }
+        ]
+      },
+      ecommerce: {
+        name: "E-Ticaret & Destek",
+        options: [
+          { key: "kargo-takip", desc: "Kargo nerede, kurye takip no, geciken teslimat sorguları" },
+          { key: "iade-ve-iptal", desc: "Sipariş iptali, ürün iadesi, para iadesi, cayma hakkı" },
+          { key: "odeme-fatura", desc: "Kredi kartı çekimi, taksit, fatura talebi, vergi numarası" },
+          { key: "teknik-destek", desc: "Ürün kurulumu, arıza, kırık veya eksik parça bildirimi" },
+          { key: "genel-danisma", desc: "Çalışma saatleri, mağaza lokasyonları ve genel danışma" }
+        ],
+        samples: [
+          { text: "Siparişim 4 gündür yolda görünüyor kargo takip no verebilir misiniz", label: "📦 Kargo: 'Siparişim nerede kargoya verildi mi'", color: "text-amber-400" },
+          { text: "Beden uymadığı için kazağı iade edip ücretimi geri almak istiyorum", label: "🔄 İade: 'Ürün iadesi ve para iadesi talebi'", color: "text-pink-400" },
+          { text: "Kredi kartımdan mükerrer iki kere çekim yapılmış e-faturamı gönderin", label: "💳 Fatura: 'Mükerrer çekim ve fatura talebi'", color: "text-emerald-400" }
+        ]
+      },
+      hr: {
+        name: "İK & Şirket İçi Operasyon",
+        options: [
+          { key: "izin-talebi", desc: "Yıllık izin, mazeret izni, evlilik veya doğum izni, rapor" },
+          { key: "masraf-onayi", desc: "Yemek ve taksi fişleri, müşteri harcaması, avans talebi" },
+          { key: "it-donanim", desc: "Yeni laptop, monitör, mouse, şifre sıfırlama, VPN yetkisi" },
+          { key: "bordro-bilgisi", desc: "Maaş dökümü, prim ödemesi, bordro görüntüleme, BES" },
+          { key: "genel-ik", desc: "Şirket içi yönetmelik, servis güzergahları ve yan haklar" }
+        ],
+        samples: [
+          { text: "Gelecek hafta Perşembe ve Cuma günleri için yıllık izin talep ediyorum", label: "🏖️ İzin: 'Yıllık izin talebi'", color: "text-cyan-400" },
+          { text: "Müşteri ziyareti taksi fişi ve yemek masrafı girişini nereden yapabilirim", label: "💸 Masraf: 'Taksi ve yemek fişi onayı'", color: "text-yellow-400" },
+          { text: "Yeni başlayan stajyer için laptop ve şirket içi VPN erişim tanımlaması lazım", label: "💻 IT: 'Laptop ve VPN talebi'", color: "text-indigo-400" }
+        ]
+      }
+    };
+
+    function loadPreset(presetKey) {
+      const preset = PRESETS[presetKey];
+      if (!preset) return;
+
+      // Buton vurgularını güncelle
+      document.querySelectorAll(".preset-btn").forEach(b => {
+        b.className = "preset-btn px-2.5 py-1 rounded-xl border border-gray-800 bg-gray-900/80 hover:bg-gray-800 text-gray-300 font-semibold text-[11px] flex items-center gap-1.5 transition active:scale-95";
+      });
+      const activeBtn = document.getElementById("presetBtn_" + presetKey);
+      if (activeBtn) {
+        activeBtn.className = "preset-btn px-2.5 py-1 rounded-xl border border-pink-500 bg-pink-500/20 text-pink-300 font-semibold text-[11px] flex items-center gap-1.5 transition active:scale-95";
+      }
+
+      // Tabloyu doldur
+      const tbody = document.getElementById("criteriaTableBody");
+      tbody.innerHTML = "";
+      preset.options.forEach(opt => addChoiceRow(opt.key, opt.desc));
+
+      // Hızlı test butonlarını doldur
+      const samplesDiv = document.getElementById("quickTestButtons");
+      samplesDiv.innerHTML = "";
+      preset.samples.forEach(s => {
+        const btn = document.createElement("button");
+        btn.className = `px-3 py-1 rounded-lg bg-gray-900 hover:bg-gray-800 ${s.color} border border-gray-800 transition active:scale-95 text-left`;
+        btn.textContent = s.label;
+        btn.onclick = () => setQuery(s.text);
+        samplesDiv.appendChild(btn);
+      });
+
+      if (preset.samples.length > 0) {
+        document.getElementById("testMsgInput").value = preset.samples[0].text;
+      }
+    }
+
+    function addChoiceRow(key = "", desc = "") {
+      const tbody = document.getElementById("criteriaTableBody");
+      const tr = document.createElement("tr");
+      tr.className = "border-b border-gray-800/60 hover:bg-gray-900/40 transition group";
+      tr.innerHTML = `
+        <td class="py-1.5 pr-2 w-1/3">
+          <input type="text" value="${key}" placeholder="örn: kargo-takip" 
+                 class="choice-key w-full px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-700/80 text-pink-400 font-mono text-xs focus:outline-none focus:border-pink-500 font-bold">
+        </td>
+        <td class="py-1.5 pr-2">
+          <input type="text" value="${desc}" placeholder="Kriter / açıklama tanımlayın..." 
+                 class="choice-desc w-full px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-700/80 text-gray-200 text-xs focus:outline-none focus:border-pink-500">
+        </td>
+        <td class="py-1.5 text-center w-10">
+          <button onclick="removeChoiceRow(this)" title="Seçeneği Sil" 
+                  class="w-7 h-7 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 transition flex items-center justify-center text-xs">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+      updateChoiceCount();
+    }
+
+    function removeChoiceRow(btn) {
+      const tbody = document.getElementById("criteriaTableBody");
+      if (tbody.children.length <= 2) {
+        alert("En az 2 seçenek bulunmalıdır!");
+        return;
+      }
+      const tr = btn.closest("tr");
+      tr.remove();
+      updateChoiceCount();
+    }
+
+    function updateChoiceCount() {
+      const count = document.getElementById("criteriaTableBody").children.length;
+      document.getElementById("choiceCountBadge").textContent = count + " Seçenek Aktif";
+    }
+
+    function getCriteriaFromUI() {
+      const rows = document.querySelectorAll("#criteriaTableBody tr");
+      const criteria = {};
+      rows.forEach(tr => {
+        const key = tr.querySelector(".choice-key")?.value.trim();
+        const desc = tr.querySelector(".choice-desc")?.value.trim();
+        if (key) {
+          criteria[key] = desc || key;
+        }
+      });
+      return Object.keys(criteria).length > 0 ? criteria : null;
+    }
+
+    function toggleChoiceEditorCollapse() {
+      isChoiceEditorCollapsed = !isChoiceEditorCollapsed;
+      const body = document.getElementById("choiceEditorBody");
+      const txt = document.getElementById("txtToggleChoiceEditor");
+      const icon = document.getElementById("iconToggleChoiceEditor");
+
+      if (isChoiceEditorCollapsed) {
+        body.classList.add("hidden");
+        txt.textContent = "Göster";
+        icon.className = "fa-solid fa-chevron-down text-[10px]";
+      } else {
+        body.classList.remove("hidden");
+        txt.textContent = "Gizle";
+        icon.className = "fa-solid fa-chevron-up text-[10px]";
+      }
+    }
+
+    // LocalStorage & Initial Load
+    document.addEventListener("DOMContentLoaded", () => {
+      const savedKey = localStorage.getItem("decision_groq_api_key");
+      if (savedKey) document.getElementById("apiKeyInput").value = savedKey;
+      const savedModel = localStorage.getItem("decision_selected_model");
+      if (savedModel) document.getElementById("modelSelect").value = savedModel;
+      
+      // Varsayılan Ajan Şablonunu Yükle (Agent A / B / C)
+      loadPreset("agents_abc");
+
+      refreshClusterStats();
+      setInterval(refreshClusterStats, 5000);
+    });
+
+    document.getElementById("apiKeyInput").addEventListener("input", (e) => {
+      localStorage.setItem("decision_groq_api_key", e.target.value.trim());
+    });
+    document.getElementById("modelSelect").addEventListener("change", (e) => {
+      localStorage.setItem("decision_selected_model", e.target.value);
+    });
+
+    let isCustomModel = false;
+    function toggleCustomModelInput() {
+      isCustomModel = !isCustomModel;
+      const selBox = document.getElementById("modelSelectContainer");
+      const inpBox = document.getElementById("modelCustomContainer");
+      const inp = document.getElementById("modelCustomInput");
+      const sel = document.getElementById("modelSelect");
+
+      if (isCustomModel) {
+        selBox.classList.add("hidden");
+        inpBox.classList.remove("hidden");
+        inp.value = sel.value;
+        inp.focus();
+      } else {
+        inpBox.classList.add("hidden");
+        selBox.classList.remove("hidden");
+        if (inp.value.trim()) {
+          let found = false;
+          for (let opt of sel.options) {
+            if (opt.value === inp.value.trim()) {
+              opt.selected = true;
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            const newOpt = new Option(inp.value.trim(), inp.value.trim(), true, true);
+            sel.add(newOpt);
+          }
+          localStorage.setItem("decision_selected_model", inp.value.trim());
+        }
+      }
+    }
+
+    async function fetchAvailableModels() {
+      const apiKey = document.getElementById("apiKeyInput").value.trim();
+      const baseUrl = document.getElementById("baseUrlInput").value.trim();
+      const btn = document.getElementById("btnFetchModels");
+      if (!apiKey) {
+        alert("Lütfen önce API anahtarınızı (API Key) giriniz!");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Modeller Çekiliyor...`;
+
+      try {
+        const res = await fetch("/v1/models", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ api_key: apiKey, base_url: baseUrl })
+        });
+        const data = await res.json();
+        if (data.models && data.models.length > 0) {
+          const select = document.getElementById("modelSelect");
+          const currentVal = select.value;
+          select.innerHTML = "";
+          
+          const optGroup = document.createElement("optgroup");
+          optGroup.label = "🔑 Hesabınızdaki Modeller (" + data.models.length + " Adet)";
+
+          data.models.forEach(m => {
+            const opt = document.createElement("option");
+            opt.value = m;
+            opt.textContent = m;
+            if (m === currentVal || m === "openai/gpt-oss-120b") opt.selected = true;
+            optGroup.appendChild(opt);
+          });
+          select.appendChild(optGroup);
+
+          btn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> ${data.models.length} Model Yüklendi!`;
+          setTimeout(() => {
+            btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> Modelleri Yenile`;
+            btn.disabled = false;
+          }, 2500);
+        } else if (data.error) {
+          alert("Modeller alınamadı: " + data.error);
+          btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> Tekrar Dene`;
+          btn.disabled = false;
+        }
+      } catch (err) {
+        alert("Bağlantı hatası: " + err);
+        btn.innerHTML = `<i class="fa-solid fa-cloud-arrow-down"></i> Tekrar Dene`;
+        btn.disabled = false;
+      }
+    }
+
+    function setQuery(text) {
+      document.getElementById("testMsgInput").value = text;
+      runCompare();
+    }
+
+    async function refreshClusterStats() {
+      try {
+        const res = await fetch("/v1/cluster/status");
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.rule_engine && data.rule_engine.status === "healthy") {
+          document.getElementById("ruleMem").textContent = data.rule_engine.memory_mb + " MB";
+          document.getElementById("ruleStatus").className = "px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono";
+          document.getElementById("ruleStatus").textContent = "Online (8001)";
+        }
+        if (data.slm_engine && data.slm_engine.status === "healthy") {
+          document.getElementById("slmMem").textContent = data.slm_engine.memory_mb + " MB";
+          document.getElementById("slmStatus").className = "px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400 text-[10px] font-mono";
+          document.getElementById("slmStatus").textContent = "Online (8002)";
+        }
+        if (data.cloud_engine && data.cloud_engine.status === "healthy") {
+          document.getElementById("cloudMem").textContent = data.cloud_engine.memory_mb + " MB";
+          document.getElementById("cloudStatus").className = "px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 text-[10px] font-mono";
+          document.getElementById("cloudStatus").textContent = "Online (8003)";
+        }
+        if (data.gateway_ui) {
+          document.getElementById("uiMem").textContent = data.gateway_ui.memory_mb + " MB";
+        }
+      } catch (err) {
+        console.warn("Metrikler alinamadi:", err);
+      }
+    }
+
+    // 💬 KONUŞMA BALONU TEKİL AÇILMA / KAPANMA MANTIĞI
+    function toggleRawView(index) {
+      if (activeRawIndex === index) {
+        closeRawView();
+        return;
+      }
+      activeRawIndex = index;
+      renderRawView();
+    }
+
+    function closeRawView() {
+      activeRawIndex = null;
+      document.getElementById("rawSpeechBubble").classList.add("hidden");
+      resetRawButtons();
+    }
+
+    function resetRawButtons() {
+      for (let i = 1; i <= 3; i++) {
+        const icon = document.getElementById("iconRaw" + i);
+        const btn = document.getElementById("btnRaw" + i);
+        if (icon) icon.className = "fa-solid fa-chevron-down text-[10px] text-gray-500 transition-transform duration-200";
+        if (btn) btn.classList.remove("ring-2", "ring-yellow-500", "ring-purple-500", "ring-blue-500", "bg-gray-800");
+      }
+    }
+
+    function renderRawView() {
+      if (activeRawIndex === null) return;
+
+      const bubble = document.getElementById("rawSpeechBubble");
+      const box = document.getElementById("speechBubbleBox");
+      const arrow = document.getElementById("speechArrow");
+      const badge = document.getElementById("speechBadge");
+      const title = document.getElementById("speechTitle");
+      const pre = document.getElementById("rawCodeBlock");
+
+      resetRawButtons();
+
+      let targetData = null;
+      let badgeText = "";
+      let titleText = "";
+      let arrowPos = "16.6%";
+      let borderClass = "";
+      let arrowBorder = "";
+      let badgeClass = "";
+      let activeBtnClass = "";
+
+      if (activeRawIndex === 1) {
+        targetData = latestBenchmarkData ? latestBenchmarkData.engine_1_rule : {
+          info: "Henüz karşılaştırma çalıştırılmadı. Lütfen yukarıdaki '3 Motoru Eşzamanlı Yarıştır' butonuna basınız.",
+          engine_type: "rule_based",
+          port: 8001
+        };
+        badgeText = "Motor 1 (Rule)";
+        titleText = "Kural Motoru (Regex / CPU) Ham JSON Çıktısı";
+        arrowPos = "16.6%";
+        borderClass = "border-yellow-500/50";
+        arrowBorder = "border-b-yellow-500";
+        badgeClass = "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30";
+        activeBtnClass = "ring-2 ring-yellow-500 bg-gray-800 text-yellow-300";
+        document.getElementById("iconRaw1").className = "fa-solid fa-chevron-up text-[10px] text-yellow-400 rotate-180 transition-transform duration-200";
+      } else if (activeRawIndex === 2) {
+        targetData = latestBenchmarkData ? latestBenchmarkData.engine_2_slm : {
+          info: "Henüz karşılaştırma çalıştırılmadı. Lütfen yukarıdaki '3 Motoru Eşzamanlı Yarıştır' butonuna basınız.",
+          engine_type: "local_slm_neural",
+          port: 8002
+        };
+        badgeText = "Motor 2 (SLM)";
+        titleText = "Lokal Nöral SLM (Qwen2.5-1.5B) Ham JSON Çıktısı";
+        arrowPos = "50%";
+        borderClass = "border-purple-500/60";
+        arrowBorder = "border-b-purple-500";
+        badgeClass = "bg-purple-500/20 text-purple-300 border border-purple-500/30";
+        activeBtnClass = "ring-2 ring-purple-500 bg-purple-900/60 text-purple-100";
+        document.getElementById("iconRaw2").className = "fa-solid fa-chevron-up text-[10px] text-purple-400 rotate-180 transition-transform duration-200";
+      } else if (activeRawIndex === 3) {
+        targetData = latestBenchmarkData ? latestBenchmarkData.engine_3_cloud : {
+          info: "Henüz karşılaştırma çalıştırılmadı. Lütfen yukarıdaki '3 Motoru Eşzamanlı Yarıştır' butonuna basınız.",
+          engine_type: "cloud_llm",
+          port: 8003
+        };
+        badgeText = "Motor 3 (Cloud)";
+        titleText = "Harici Bulut LLM (Groq / OpenAI) Ham JSON Çıktısı";
+        arrowPos = "83.3%";
+        borderClass = "border-blue-500/60";
+        arrowBorder = "border-b-blue-500";
+        badgeClass = "bg-blue-500/20 text-blue-400 border border-blue-500/30";
+        activeBtnClass = "ring-2 ring-blue-500 bg-blue-900/60 text-blue-100";
+        document.getElementById("iconRaw3").className = "fa-solid fa-chevron-up text-[10px] text-blue-400 rotate-180 transition-transform duration-200";
+      }
+
+      const activeBtn = document.getElementById("btnRaw" + activeRawIndex);
+      if (activeBtn) activeBtn.className += " " + activeBtnClass;
+
+      arrow.style.left = arrowPos;
+      arrow.className = `absolute top-1 -translate-x-1/2 w-0 h-0 border-x-8 border-x-transparent border-b-8 ${arrowBorder} transition-all duration-300`;
+
+      box.className = `glass rounded-3xl border ${borderClass} p-5 shadow-2xl space-y-3 relative bg-[#090b12]/95 backdrop-blur-xl transition-all duration-300`;
+      badge.textContent = badgeText;
+      badge.className = `px-2.5 py-1 rounded-xl text-xs font-mono font-bold ${badgeClass}`;
+      title.textContent = titleText;
+
+      pre.textContent = JSON.stringify(targetData, null, 2);
+
+      bubble.classList.remove("hidden");
+      bubble.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function copyRawJson() {
+      const pre = document.getElementById("rawCodeBlock");
+      navigator.clipboard.writeText(pre.textContent).then(() => {
+        const copyText = document.getElementById("copyBtnText");
+        copyText.textContent = "Kopyalandı! ✓";
+        setTimeout(() => { copyText.textContent = "Kopyala"; }, 2000);
+      });
+    }
+
+    async function runCompare() {
+      const msg = document.getElementById("testMsgInput").value.trim();
+      if (!msg) return;
+
+      const apiKey = document.getElementById("apiKeyInput").value.trim();
+      const baseUrl = document.getElementById("baseUrlInput").value.trim();
+      const model = isCustomModel ? document.getElementById("modelCustomInput").value.trim() : document.getElementById("modelSelect").value;
+      const btn = document.getElementById("btnCompare");
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 3 Motor Koşturuluyor...`;
+
+      try {
+        const criteriaPayload = getCriteriaFromUI();
+        const res = await fetch("/v1/compare", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            message: msg,
+            api_key: apiKey,
+            base_url: baseUrl,
+            model: model,
+            criteria: criteriaPayload
+          })
+        });
+
+        const data = await res.json();
+        latestBenchmarkData = data;
+
+        // 1. Motor
+        document.getElementById("resE1Choice").textContent = data.engine_1_rule.choice || "-";
+        document.getElementById("resE1Latency").textContent = data.engine_1_rule.latency_ms + " ms";
+        document.getElementById("resE1Conf").textContent = "%" + (data.engine_1_rule.confidence * 100).toFixed(1);
+        document.getElementById("resE1Reason").textContent = data.engine_1_rule.reason || "-";
+        document.getElementById("resE1Score").textContent = data.engine_1_rule.score ? (data.engine_1_rule.score.score + " / 2.0") : "-";
+        document.getElementById("resE1Noul").textContent = data.engine_1_rule.noul ? ("%" + (data.engine_1_rule.noul.noul * 100).toFixed(0)) : "-";
+
+        // 2. Motor
+        document.getElementById("resE2Choice").textContent = data.engine_2_slm.choice || "-";
+        document.getElementById("resE2Latency").textContent = data.engine_2_slm.latency_ms + " ms";
+        document.getElementById("resE2Conf").textContent = "%" + (data.engine_2_slm.confidence * 100).toFixed(1);
+        document.getElementById("resE2Reason").textContent = data.engine_2_slm.reason || "-";
+        document.getElementById("resE2Score").textContent = data.engine_2_slm.score ? (data.engine_2_slm.score.score + " / 2.0") : "-";
+        document.getElementById("resE2Noul").textContent = data.engine_2_slm.noul ? ("%" + (data.engine_2_slm.noul.noul * 100).toFixed(0)) : "-";
+
+        // 3. Motor
+        document.getElementById("resE3ModelName").textContent = data.engine_3_cloud.model_name || model;
+        document.getElementById("resE3Choice").textContent = data.engine_3_cloud.choice || "-";
+        document.getElementById("resE3Latency").textContent = data.engine_3_cloud.latency_ms ? data.engine_3_cloud.latency_ms + " ms" : "0 ms";
+        document.getElementById("resE3Conf").textContent = data.engine_3_cloud.confidence ? "%" + (data.engine_3_cloud.confidence * 100).toFixed(1) : "-";
+        document.getElementById("resE3Reason").textContent = data.engine_3_cloud.reason || "-";
+        document.getElementById("resE3Score").textContent = data.engine_3_cloud.score ? (data.engine_3_cloud.score.score + " / 2.0") : "-";
+        document.getElementById("resE3Noul").textContent = data.engine_3_cloud.noul ? ("%" + (data.engine_3_cloud.noul.noul * 100).toFixed(0)) : "-";
+
+        // Konsensüs Bandı
+        const banner = document.getElementById("consensusBanner");
+        const icon = document.getElementById("consensusIcon");
+        const title = document.getElementById("consensusTitle");
+        const desc = document.getElementById("consensusDesc");
+        const winner = document.getElementById("winnerSpeedBadge");
+
+        banner.classList.remove("hidden");
+        winner.textContent = data.consensus.winner_speed;
+
+        const bestChoice = data.engine_2_slm.choice || data.engine_1_rule.choice || data.engine_3_cloud.choice;
+
+        if (data.consensus.all_agree) {
+          banner.className = "glass p-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 flex flex-col sm:flex-row items-center justify-between gap-3";
+          icon.className = "w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg";
+          icon.innerHTML = `<i class="fa-solid fa-circle-check"></i>`;
+          title.textContent = `Tam Fikir Birliği (${bestChoice})`;
+          title.className = "text-sm font-bold text-emerald-400";
+          desc.textContent = `Tüm aktif motorlar aynı seçenek tercihinde ('${bestChoice}') tam fikir birliğine vardı.`;
+        } else {
+          banner.className = "glass p-4 rounded-2xl border border-pink-500/30 bg-pink-950/20 flex flex-col sm:flex-row items-center justify-between gap-3";
+          icon.className = "w-10 h-10 rounded-xl bg-pink-500/20 text-pink-400 flex items-center justify-center text-lg";
+          icon.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i>`;
+          title.textContent = "Ayrışma Tespit Edildi (Farklı Tercihler)";
+          title.className = "text-sm font-bold text-pink-400";
+          const c1 = data.engine_1_rule.choice || '-';
+          const c2 = data.engine_2_slm.choice || '-';
+          const c3 = data.engine_3_cloud.choice;
+          desc.textContent = `Motorlar arasında karar farklılığı: Kural Motoru: ${c1} | Nöral SLM: ${c2}` + (c3 && c3 !== 'API Key Yok' ? ` | Bulut LLM: ${c3}` : "");
+        }
+
+        // Eğer bir ham çıktı balonu açıksa, yeni gelen veriyle anında güncelle
+        if (activeRawIndex !== null) {
+          renderRawView();
+        }
+
+      } catch (err) {
+        alert("Karşılaştırma hatası: " + err);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-play"></i> 3 Motoru Eşzamanlı Yarıştır`;
+        refreshClusterStats();
+      }
+    }
+  </script>
+</body>
+</html>

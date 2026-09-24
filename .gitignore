@@ -1,0 +1,41 @@
+﻿# Virtual Environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Large Language Models (GGUF, bin, weights - DO NOT PUSH TO GITHUB)
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/*.pth
+models/*.pt
+!models/.gitkeep
+
+# Environment variables & secrets
+.env
+.env.*
+*.key
+*.pem
+*.secret
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

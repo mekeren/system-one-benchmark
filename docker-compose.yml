@@ -1,0 +1,112 @@
+services:
+  # -------------------------------------------------------------
+  # SERVİS 1: Kural Tabanlı Karar Motoru (Ultra Hafif CPU Regex)
+  # -------------------------------------------------------------
+  rule-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: decision-rule-engine
+    command: python services/rule_service.py
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./services:/app/services:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # -------------------------------------------------------------
+  # SERVİS 2: Lokal Nöral SLM Motoru (Qwen2.5-1.5B GGUF Model)
+  # -------------------------------------------------------------
+  slm-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: decision-slm-engine
+    command: python services/slm_service.py
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./models:/app/models:ro
+      - ./services:/app/services:ro
+    environment:
+      - MODEL_PATH=/app/models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+      - CPU_THREADS=4
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 2048M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # -------------------------------------------------------------
+  # SERVİS 3: Harici Bulut LLM Gateway (Groq / OpenAI API Proxy)
+  # -------------------------------------------------------------
+  cloud-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: decision-cloud-engine
+    command: python services/cloud_service.py
+    ports:
+      - "8003:8003"
+    volumes:
+      - ./services:/app/services:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # -------------------------------------------------------------
+  # SERVİS 4: Web UI Dashboard & Paralel Gateway Orkestratörü
+  # -------------------------------------------------------------
+  ui-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: decision-ui-gateway
+    command: python services/ui_gateway.py
+    ports:
+      - "8150:8150"
+    volumes:
+      - ./services:/app/services:ro
+    environment:
+      - RULE_SERVICE_URL=http://rule-engine:8001
+      - SLM_SERVICE_URL=http://slm-engine:8002
+      - CLOUD_SERVICE_URL=http://cloud-engine:8003
+    depends_on:
+      - rule-engine
+      - slm-engine
+      - cloud-engine
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8150/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
