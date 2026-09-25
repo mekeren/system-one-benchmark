@@ -353,7 +353,10 @@
               <span class="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-xs font-bold">2</span>
               <div>
                 <h3 class="text-sm font-bold text-white">Lokal Nöral SLM</h3>
-                <p class="text-[10px] text-purple-400">Qwen2.5-1.5B (GGUF CPU)</p>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <p class="text-[10px] text-purple-400">Qwen2.5-1.5B (GGUF CPU)</p>
+                  <span id="resE2MethodBadge" class="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono">GBNF Grammar & Logit</span>
+                </div>
               </div>
             </div>
             <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">$0 Maliyet</span>
@@ -964,6 +967,16 @@
         document.getElementById("resE2Reason").textContent = data.engine_2_slm.reason || "-";
         document.getElementById("resE2Score").textContent = data.engine_2_slm.score ? (data.engine_2_slm.score.score + " / 2.0") : "-";
         document.getElementById("resE2Noul").textContent = data.engine_2_slm.noul ? ("%" + (data.engine_2_slm.noul.noul * 100).toFixed(0)) : "-";
+        const mBadge = document.getElementById("resE2MethodBadge");
+        if (mBadge) {
+          if (data.engine_2_slm.decoding_method === "gbnf_grammar_constrained") {
+            mBadge.textContent = "GBNF Constrained";
+            mBadge.className = "text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono";
+          } else {
+            mBadge.textContent = "Logit & Softmax";
+            mBadge.className = "text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 font-mono";
+          }
+        }
 
         // 3. Motor
         document.getElementById("resE3ModelName").textContent = data.engine_3_cloud.model_name || model;

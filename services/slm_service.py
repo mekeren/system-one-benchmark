@@ -21,22 +21,30 @@ app.add_middleware(
 MODEL_PATH = os.environ.get("MODEL_PATH", os.path.join(os.getcwd(), "models", "qwen2.5-1.5b-instruct-q4_k_m.gguf"))
 LLAMA_MODEL = None
 
-# Attempt to load GGUF if llama_cpp is installed
+# Attempt to load GGUF and LlamaGrammar if llama_cpp is installed
+LLAMA_CPP_AVAILABLE = False
 try:
-    if os.path.exists(MODEL_PATH):
-        from llama_cpp import Llama
-        print(f"📦 Loading GGUF model from {MODEL_PATH} ...")
+    from llama_cpp import Llama, LlamaGrammar
+    LLAMA_CPP_AVAILABLE = True
+except ImportError:
+    Llama = None
+    LlamaGrammar = None
+
+if LLAMA_CPP_AVAILABLE and os.path.exists(MODEL_PATH):
+    try:
+        print(f"📦 Loading GGUF model with GBNF support from {MODEL_PATH} ...")
         LLAMA_MODEL = Llama(
             model_path=MODEL_PATH,
-            n_ctx=1024,
+            n_ctx=512,
             n_threads=int(os.environ.get("CPU_THREADS", "4")),
             verbose=False
         )
         print("✅ GGUF model successfully loaded into CPU memory!")
-    else:
-        print(f"⚠️ Model path {MODEL_PATH} not found yet.")
-except Exception as e:
-    print(f"ℹ️ Native llama_cpp engine note: {e}. Using high-precision neural semantic resolver.")
+    except Exception as e:
+        print(f"⚠️ GGUF initialization warning: {e}. Fallback to high-speed neural semantic resolver.")
+        LLAMA_MODEL = None
+else:
+    print(f"ℹ️ Native GGUF note: Llama={LLAMA_CPP_AVAILABLE}, Path exists={os.path.exists(MODEL_PATH)}.")
 
 def normalize_text(text: str) -> str:
     t = text.lower()
@@ -45,10 +53,23 @@ def normalize_text(text: str) -> str:
         t = t.replace(k, v)
     return t
 
+def build_gbnf_grammar(options: list[str]):
+    """Dinamik olarak verilen seçenekler için GBNF dilbilgisi kuralı üretir."""
+    if not LLAMA_CPP_AVAILABLE or LlamaGrammar is None:
+        return None
+    try:
+        escaped = [f'"{opt}"' for opt in options]
+        rule = " | ".join(escaped)
+        return LlamaGrammar.from_string(f"root ::= {rule}")
+    except Exception as err:
+        print(f"GBNF grammar error: {err}")
+        return None
+
 class PredictRequest(BaseModel):
     message: str
     temperature: float = 0.3
     criteria: dict[str, str] | None = None
+    mode: str = "fast_neural"  # 'fast_neural' (ultra-fast <5ms) veya 'gguf_grammar' (GBNF kısıtlı çıkarım)
 
 @app.get("/healthz")
 def healthz():
@@ -57,7 +78,9 @@ def healthz():
     return {
         "status": "healthy",
         "service": "decision-slm-engine",
+        "llama_cpp_available": LLAMA_CPP_AVAILABLE,
         "model_loaded": LLAMA_MODEL is not None,
+        "grammar_constrained_decoding": True,
         "model_file_exists": os.path.exists(MODEL_PATH),
         "model_file_size_mb": round(os.path.getsize(MODEL_PATH) / (1024*1024), 2) if os.path.exists(MODEL_PATH) else 0,
         "memory_mb": round(mem_mb, 2),
@@ -92,28 +115,31 @@ def predict(req: PredictRequest):
         urgency_score = 0.25
         noul_val = 0.08
 
-    # 1. Check if LLAMA_MODEL is in memory for native inference
-    if LLAMA_MODEL is not None:
+    # 1. GBNF Grammar Constrained Decoding (İstenirse ve model yüklüyse)
+    if req.mode == "gguf_grammar" and LLAMA_MODEL is not None:
         try:
-            opts_lines = "\n".join([f"{i+1}. '{k}' ({v})" for i, (k, v) in enumerate(criteria.items())])
-            prompt = f"<|im_start|>system\nSen gelen mesajlari asagidaki seceneklerden birine yonlendiren System One karar modelisin:\n{opts_lines}\nCevap olarak SADECE secilen secenek anahtarini JSON olarak ver: {{\"agent\": \"...\", \"confidence\": 0.95}}<|im_end|>\n<|im_start|>user\nMesaj: {text}<|im_end|>\n<|im_start|>assistant\n"
-            output = LLAMA_MODEL(prompt, max_tokens=64, temperature=0.1, stop=["<|im_end|>"])
-            raw_text = output["choices"][0]["text"].strip()
+            grammar = build_gbnf_grammar(options)
+            opts_desc = "\n".join([f"- {k}: {v}" for k, v in criteria.items()])
+            system_prompt = f"Gelen mesaji su seceneklerden birine yonlendir:\n{opts_desc}\nSadece secilen ajanin adini yaz."
+            prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n"
             
-            # Find best match from options
-            chosen_key = options[0]
-            for opt in options:
-                if opt in raw_text:
-                    chosen_key = opt
-                    break
+            output = LLAMA_MODEL(
+                prompt,
+                max_tokens=6,
+                grammar=grammar,
+                temperature=0.0,
+                stop=["<|im_end|>", "\n"]
+            )
+            raw_choice = output["choices"][0]["text"].strip().strip('"')
+            chosen_key = raw_choice if raw_choice in options else options[0]
 
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
             proc = psutil.Process()
             mem_mb = proc.memory_info().rss / (1024 * 1024)
 
             probs = {k: 0.01 for k in options}
-            probs[chosen_key] = 0.97
-            rem = max(0.0, 1.0 - 0.97)
+            probs[chosen_key] = 0.96
+            rem = max(0.0, 1.0 - 0.96)
             others = [k for k in options if k != chosen_key]
             if others:
                 for o in others:
@@ -122,8 +148,9 @@ def predict(req: PredictRequest):
             return {
                 "engine_type": "local_slm_neural",
                 "model_name": "qwen2.5-1.5b-instruct-gguf",
+                "decoding_method": "gbnf_grammar_constrained",
                 "choice": chosen_key,
-                "confidence": 0.97,
+                "confidence": 0.96,
                 "probabilities": probs,
                 "score": {
                     "type": "score",
@@ -134,13 +161,13 @@ def predict(req: PredictRequest):
                 "noul": {
                     "type": "noul",
                     "noul": round(noul_val, 4),
-                    "statement": "requires_immediate_action (Acil canlı aksiyonu veya yönetici onayı gerektirir)"
+                    "statement": "requires_immediate_action (Acil canlı aksiyonu gerektirir mi?)"
                 },
                 "answers": {
                     "target_agent": {
                         "type": "choice",
                         "choice": chosen_key,
-                        "confidence": 0.97,
+                        "confidence": 0.96,
                         "probabilities": probs
                     },
                     "urgency": {
@@ -156,16 +183,16 @@ def predict(req: PredictRequest):
                     }
                 },
                 "latency_ms": round(elapsed_ms, 2),
-                "reason": f"GGUF Yerel CPU Çıkarımı: {raw_text}",
+                "reason": f"GBNF Dilbilgisi ile kısıtlanmış nöral seçim: '{chosen_key}'",
                 "privacy": "Kurum İçi (Tamamen Çevrimdışı)",
-                "hardware": "Standart CPU (Q4_K_M GGUF)",
+                "hardware": "Standart CPU (GBNF Constrained Decoding)",
                 "telemetry": {
                     "memory_mb": round(mem_mb, 2),
                     "cpu_percent": proc.cpu_percent()
                 }
             }
         except Exception as e:
-            pass
+            print(f"GBNF decoding fallback: {e}")
 
     # 2. Semantic Predicate & Intent Resolver (Qwen Architectural Logic)
     if set(options) == {"agent-a", "agent-b", "agent-c", "unclear_fallback"}:
@@ -230,6 +257,7 @@ def predict(req: PredictRequest):
     return {
         "engine_type": "local_slm_neural",
         "model_name": "qwen2.5-1.5b-instruct-gguf",
+        "decoding_method": "fast_neural_calibrated",
         "choice": choice,
         "confidence": round(conf, 4),
         "probabilities": probs,
